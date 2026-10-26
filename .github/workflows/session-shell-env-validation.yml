@@ -29,6 +29,8 @@ jobs:
       - name: Install dependencies
         timeout-minutes: 15
         run: bun install --frozen-lockfile
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build SDK, CLI, and platform binaries with compiled Hub smoke
         timeout-minutes: 30
         run: bun apps/cli/script/build.ts --install-native-variants
@@ -54,3 +56,28 @@ jobs:
             validation-source-commit.txt
             validation-darwin-arm64.sha256
           if-no-files-found: error
+
+  windows-sdk-tests:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: node
+      - name: Install dependencies
+        timeout-minutes: 15
+        run: bun install --frozen-lockfile
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build SDK
+        run: bun run build:sdk
+      - name: Build CLI
+        run: bun -F @cline/cli build
+      - name: SDK tests on Windows
+        run: bun -F './sdk/packages/**' test
