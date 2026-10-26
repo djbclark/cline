@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      SOURCE_COMMIT: 7a4835e4ac823b3d45984ca737efd6632bf67bad
+      SOURCE_COMMIT: 2249608eabcd6ffaa54e71bea430a92797b764c6
     steps:
       - uses: actions/checkout@v4
         with:
@@ -43,6 +43,9 @@ jobs:
         run: |
           bun -F @cline/core test:unit
           bun -F @cline/cli test:unit
+      - name: Shutdown end-to-end regression with latest Bun
+        working-directory: sdk/packages/core
+        run: bun run test:e2e src/hub/daemon/shutdown.e2e.test.ts
       - name: Record source and macOS payload hashes
         if: ${{ always() && steps.build_cli.outcome == 'success' }}
         run: |
@@ -63,6 +66,8 @@ jobs:
   windows-sdk-tests:
     runs-on: windows-latest
     timeout-minutes: 45
+    env:
+      SOURCE_COMMIT: 2249608eabcd6ffaa54e71bea430a92797b764c6
     steps:
       - uses: actions/checkout@v4
         with:
@@ -82,10 +87,13 @@ jobs:
         run: bun run build:sdk
       - name: Build CLI
         run: bun -F @cline/cli build
+      - name: Verify reviewed product integration
+        run: git diff --exit-code $env:SOURCE_COMMIT HEAD -- sdk apps/cli
       - name: SDK tests on Windows
         run: bun -F './sdk/packages/**' test
 
   windows-upstream-proxy-control:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
