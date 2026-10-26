@@ -1,0 +1,56 @@
+name: session-shell-env-validation
+
+on:
+  push:
+    branches: [ci/cli-session-env-validation]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-and-package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SOURCE_COMMIT: 0a1e2cf634058e16bd97ddc6fd6fcbfe068f42c8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: node
+      - name: Verify reviewed source
+        run: git diff --exit-code "$SOURCE_COMMIT" HEAD -- sdk apps/cli
+      - name: Install dependencies
+        timeout-minutes: 15
+        run: bun install --frozen-lockfile
+      - name: Build SDK, CLI, and platform binaries with compiled Hub smoke
+        timeout-minutes: 30
+        run: bun apps/cli/script/build.ts --install-native-variants
+      - name: Typecheck core and CLI
+        run: |
+          bun -F @cline/core typecheck
+          bun -F @cline/cli typecheck
+      - name: Core and CLI unit tests
+        run: |
+          bun -F @cline/core test:unit
+          bun -F @cline/cli test:unit
+      - name: Record source and macOS payload hashes
+        run: |
+          git rev-parse HEAD > validation-build-commit.txt
+          git rev-parse "$SOURCE_COMMIT" > validation-source-commit.txt
+          sha256sum apps/cli/dist/cli-darwin-arm64/bin/cline > validation-darwin-arm64.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cline-darwin-arm64-shell-env
+          path: |
+            apps/cli/dist/cli-darwin-arm64/
+            validation-build-commit.txt
+            validation-source-commit.txt
+            validation-darwin-arm64.sha256
+          if-no-files-found: error
